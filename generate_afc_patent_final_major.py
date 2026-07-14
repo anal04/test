@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import os
 import re
+from math import ceil
 from math import sin, pi
 from xml.sax.saxutils import escape
 
@@ -37,7 +38,7 @@ PURPLE = colors.HexColor('#4A148C')
 GOLD = colors.HexColor('#F57F17')
 LIGHT_BLUE = colors.HexColor('#E3F2FD')
 
-TITLE_TEXT = 'RRM-Driven, Radio-Aware Automated Frequency Coordination (AFC) Request Management and Enforcement for Multi-Radio Access Points'
+TITLE_TEXT = 'System and Method for Automated Frequency Coordination-Integrated Radio Resource Management in 6 GHz Wireless Access Networks'
 
 FIG_TITLES = {
     1: 'Overall System Architecture',
@@ -228,23 +229,46 @@ def mk_para(txt, style):
     return Paragraph(escape(txt).replace('\n', '<br/>'), style)
 
 
-def add_heading_with_intro(story, styles, heading, bookmark, blocks):
+def is_standalone_heading_block(block):
+    text = block.strip()
+    return '\n' not in text and text.startswith('**') and text.endswith('**')
+
+
+def append_blocks(story, blocks, styles):
+    idx = 0
+    while idx < len(blocks):
+        b = blocks[idx]
+        style = styles['code'] if b.startswith('|') else styles['body']
+        if is_standalone_heading_block(b) and idx + 1 < len(blocks):
+            next_block = blocks[idx + 1]
+            next_style = styles['code'] if next_block.startswith('|') else styles['body']
+            story.append(KeepTogether([
+                mk_para(b, style),
+                mk_para(next_block, next_style),
+                Spacer(1, 0.05 * inch),
+            ]))
+            idx += 2
+            continue
+        story.append(mk_para(b, style))
+        story.append(Spacer(1, 0.05 * inch))
+        idx += 1
+
+
+def add_heading_with_intro(story, styles, heading, bookmark, blocks, intro_count=3, append_rest=True):
     h = Paragraph(heading, styles['h2'])
     h._bookmarkName = bookmark
     intro = []
-    for b in blocks[:2]:
+    for b in blocks[:intro_count]:
         intro.append(mk_para(b, styles['body']))
     story.append(KeepTogether([h] + intro + [Spacer(1, 0.08 * inch)]))
-    for b in blocks[2:]:
-        style = styles['code'] if b.startswith('|') else styles['body']
-        story.append(mk_para(b, style))
-        story.append(Spacer(1, 0.05 * inch))
+    if append_rest:
+        append_blocks(story, blocks[intro_count:], styles)
 
 
 def add_figure(story, fig_num, fig_title, fig_description, fig_path, styles):
     bundle = []
     bundle.append(Paragraph(f'Figure {fig_num} — {escape(fig_title)}', styles['fig_title']))
-    bundle.append(Spacer(1, 0.08 * inch))
+    bundle.append(Spacer(1, 0.12 * inch))
     if os.path.exists(fig_path):
         img = Image(fig_path, width=5.5 * inch, height=3.8 * inch)
         img.hAlign = 'CENTER'
@@ -264,6 +288,38 @@ def add_figure(story, fig_num, fig_title, fig_description, fig_path, styles):
     story.append(KeepTogether(bundle))
 
 
+def add_figure_range(story, fig_nums, fig_brief, fig_details, styles):
+    for fig_num in fig_nums:
+        title = FIG_TITLES[fig_num]
+        brief = fig_brief.get(fig_num, f'This figure illustrates {title.lower()} in the AFC-RRM architecture.')
+        detail = fig_details.get(fig_num, '')
+        desc = f'{brief} {detail}'.strip()
+        fig_path = os.path.join(FIG_DIR, f'figure_{fig_num:02d}.png')
+        generate_figure(fig_path, fig_num, title)
+        add_figure(story, fig_num, title, desc, fig_path, styles)
+
+
+def add_section_with_figures(story, styles, heading, bookmark, blocks, fig_nums, fig_brief, fig_details, intro_count=3):
+    add_heading_with_intro(story, styles, heading, bookmark, blocks, intro_count=intro_count, append_rest=False)
+    body_blocks = blocks[intro_count:]
+    if not fig_nums:
+        return
+    if not body_blocks:
+        add_figure_range(story, fig_nums, fig_brief, fig_details, styles)
+        return
+
+    interval = max(1, ceil(len(body_blocks) / (len(fig_nums) + 1)))
+    idx = 0
+    for fig_num in fig_nums:
+        next_idx = min(len(body_blocks), idx + interval)
+        append_blocks(story, body_blocks[idx:next_idx], styles)
+        add_figure_range(story, [fig_num], fig_brief, fig_details, styles)
+        idx = next_idx
+
+    append_blocks(story, body_blocks[idx:], styles)
+
+
+
 def build_story(styles, sections, imp_text, fig_brief, fig_details, toc_pages):
     story = []
 
@@ -273,7 +329,7 @@ def build_story(styles, sections, imp_text, fig_brief, fig_details, toc_pages):
     inv_table = Table([
         ['Name', 'Organization', 'Department'],
         ['Wenfeng Wang', 'HPE (Hewlett Packard Enterprise)', 'Wireless Engineering'],
-        ['May Lin', 'HPE (Hewlett Packard Enterprise)', 'Cloud Platform'],
+        ['May Lin', 'HPE (Hewlett Packard Enterprise)', 'Wireless Engineering'],
         ['Anselm Allen Joseph Arokiyaraj', 'HPE (Hewlett Packard Enterprise)', 'Wireless Engineering'],
     ], colWidths=[2.0 * inch, 2.7 * inch, 1.9 * inch])
     inv_table.setStyle(TableStyle([
@@ -338,48 +394,63 @@ def build_story(styles, sections, imp_text, fig_brief, fig_details, toc_pages):
 
     # 7 merged figure section
     story.append(PageBreak())
-    add_heading_with_intro(story, styles, '7. Brief Description of the Drawings', 'sec7', ['This section consolidates all drawing descriptions and figure content inline. Section 13 has been removed; all 22 figures are embedded directly here with corresponding explanatory text.'])
+    add_heading_with_intro(
+        story,
+        styles,
+        '7. Brief Description of the Drawings',
+        'sec7',
+        [
+            'This section consolidates the figure descriptions and the corresponding drawings into a single section.',
+            'Each figure title appears above the drawing, and the descriptive text from the former standalone figures section is retained without the redundant summary labels.',
+            'Figures 1 through 4 are presented here inline with their descriptions, while the remaining figures are distributed through the later technical sections of the application.',
+        ],
+        intro_count=3,
+    )
+    add_figure_range(story, range(1, 5), fig_brief, fig_details, styles)
 
-    for i in range(1, 23):
-        title = FIG_TITLES[i]
-        brief = fig_brief.get(i, f'This figure illustrates {title.lower()} in the AFC-RRM architecture.')
-        detail = fig_details.get(i, '')
-        desc = f'{brief} {detail}'.strip()
-        fig_path = os.path.join(FIG_DIR, f'figure_{i:02d}.png')
-        generate_figure(fig_path, i, title)
-        add_figure(story, i, title, desc, fig_path, styles)
-
-    # 8 Part A + new 8.5 section
+    # 8 Part A
     story.append(PageBreak())
     sec8_blocks = blocks_from_markdown(sections[8]['content'])
-    add_heading_with_intro(story, styles, '8. Detailed Description — Part A: AFC Core Architecture', 'sec8', sec8_blocks)
-
-    story.append(Paragraph('8.5 Dual-Band and Tri-Band Multi-Radio AFC Management', styles['h3']))
-    for p in [
-        'The is_standard_power(ap_id) decision path queries BOTH r24 (2.4 GHz) and r6 (6 GHz) band configurations because some multi-radio APs report standard_power on the primary radio band configuration surface.',
-        'For dual-band APs (2.4 GHz + 6 GHz), AFC query execution is triggered only when the r6 radio is configured for standard_power operation. If r6 is not standard_power, AFC is bypassed and the radio remains in LPI or standard non-AFC operation as policy allows.',
-        'For tri-band APs (2.4 GHz + 5 GHz + 6 GHz), AFC control is managed independently for the 6 GHz radio. The 5 GHz radio (r5) continues operating without AFC constraints while 6 GHz remains governed by AFC authorization and EIRP limits.',
-        'The band{usage}_specific configuration path is used to resolve per-band radio configuration for multi-radio APs. This allows per-radio selection of afc_standard_power and coexistence of LPI and Standard Power operation in the same AP chassis.',
-        'The afc_standard_power flag is evaluated per-radio per-band. The bandwidth selection logic supports allow_auto_bw so 20/40/80/160/320 MHz can be selected independently per radio band according to AFC response and policy state.'
-    ]:
-        story.append(mk_para(p, styles['body']))
-        story.append(Spacer(1, 0.05 * inch))
-
-    fig22b = os.path.join(FIG_DIR, 'figure_22b.png')
-    generate_figure_22b(fig22b)
-    add_figure(story, '22b', 'Multi-Radio AFC Decision Flow', 'Input includes r24, optional r5, and r6. If r6 is standard_power, an AFC query is executed and channels are assigned with EIRP limits. Otherwise operation follows LPI or non-AFC channels, with lpi_ok=True enabling graceful fallback.', fig22b, styles)
+    add_section_with_figures(
+        story,
+        styles,
+        '8. Detailed Description — Part A: AFC Core Architecture',
+        'sec8',
+        sec8_blocks,
+        [5, 6, 7, 8],
+        fig_brief,
+        fig_details,
+    )
 
     # 9,10
-    for num, bm, title in [
-        (9, 'sec9', '9. Detailed Description — Part B: RRM-AFC Integration'),
-        (10, 'sec10', '10. Detailed Description — Part C: Geolocation, EIRP, and Advanced Channel Logic'),
+    for num, bm, title, figs in [
+        (9, 'sec9', '9. Detailed Description — Part B: RRM-AFC Integration', [9, 10, 11, 12, 13]),
+        (10, 'sec10', '10. Detailed Description — Part C: Geolocation, EIRP, and Advanced Channel Logic', [14, 15, 16, 17, 18]),
     ]:
         story.append(PageBreak())
-        add_heading_with_intro(story, styles, title, bm, blocks_from_markdown(sections[num]['content']))
+        add_section_with_figures(
+            story,
+            styles,
+            title,
+            bm,
+            blocks_from_markdown(sections[num]['content']),
+            figs,
+            fig_brief,
+            fig_details,
+        )
 
     # 11 implementation reference
     story.append(PageBreak())
-    add_heading_with_intro(story, styles, '11. Implementation Reference', 'sec11', blocks_from_markdown(imp_text))
+    add_section_with_figures(
+        story,
+        styles,
+        '11. Implementation Reference',
+        'sec11',
+        blocks_from_markdown(imp_text),
+        [19, 20, 21, 22],
+        fig_brief,
+        fig_details,
+    )
 
     # 12 claims (old 11)
     story.append(PageBreak())
