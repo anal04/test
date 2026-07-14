@@ -235,7 +235,7 @@ The invention introduces a dual-constraint EIRP computation method that derives 
 1. Retrieves the AFC-reported per-channel maximum EIRP value from `availableChannelInfo[].maxEirp[]`
 2. Computes the PSD-derived EIRP from the available frequency information using:
 
-   **EIRP_from_PSD = maxPsd_dBm_per_MHz + 10 * log10(channel_bandwidth_MHz)**
+   **EIRP_from_PSD = maxPsd_dBm_per_MHz + 10 * log10(channel_bandwidth_MHz)**, where `log10` denotes the base-10 logarithm
 
    where `maxPsd` is the maximum power spectral density in dBm/MHz reported for the frequency range overlapping the channel, and `channel_bandwidth_MHz` is the channel bandwidth in MHz (20, 40, 80, 160, or 320).
 
@@ -548,8 +548,8 @@ if orientation > 180:
 **Step 2 — Location Parameter Extraction with Safety Bounds:**
 - Height above ground: `max(gps.get("elevation", {}).get("height", 3.0), 0.1)` — minimum 0.1 meters to prevent invalid zero-height submissions
 - Vertical uncertainty: integer value, default 2 meters
-- Longitude: from GPS ellipse center, default -122.0322895 (Sunnyvale, CA area)
 - Latitude: from GPS ellipse center, default 37.3228934
+- Longitude: from GPS ellipse center, default -122.0322895 (Sunnyvale, CA area)
 - Major axis: `min(325, int(gps.get("ellipse", {}).get("majorAxis", 100)))` — capped at 325 meters
 - Minor axis: `min(325, int(gps.get("ellipse", {}).get("minorAxis", 50)))` — capped at 325 meters
 
@@ -1064,9 +1064,7 @@ After `afcNode()` processing, the graph node reflects the current AFC authorizat
 
 Before the detailed narrative below, the governing mathematical expressions are stated in plain text exactly as implemented by the disclosed controller logic:
 
-EIRP_from_PSD = maxPsd_dBm_per_MHz + 10 * log10(channel_bandwidth_MHz)
-
-In this expression, `log10` denotes the base-10 logarithm.
+EIRP_from_PSD = maxPsd_dBm_per_MHz + 10 * log10(channel_bandwidth_MHz)  (log10 is the base-10 logarithm)
 
 ch_max_power = max(AFC_MIN_PSD[bandwidth], int(min(psdEirp[ch], maxEirp[j])))
 
@@ -1166,7 +1164,7 @@ lon_rad = radians(lon)
 The normal radius of curvature N at latitude lat_rad is:
 
 ```
-N = a / sqrt(1 - f * (2 - f) * sin^2(lat_rad))
+N = a / sqrt(1 - f * (2 - f) * sin(lat_rad)^2)
 ```
 
 This value represents the radius of curvature in the plane containing the surface normal and the east-west direction, varying from a at the equator to a^2/b at the poles.
@@ -1296,9 +1294,9 @@ ch_max_power = max(
     AFC_MIN_PSD.get(bandwidth, 13),
     int(min(psdEirp[ch], maxEirp[j]))
 )
-# legacy fallback 13 dBm applies only if an unsupported bandwidth is supplied;
-# supported AFC bandwidths are 20, 40, 80, 160, and 320 MHz.
 ```
+
+The fallback value of 13 dBm is a legacy guard path that applies only if an unsupported bandwidth is supplied; the supported AFC bandwidths in this implementation are 20, 40, 80, 160, and 320 MHz.
 
 This implements the dual-constraint with floor:
 - `maxEirp[j]`: AFC system's per-channel EIRP cap (dBm)
@@ -1348,7 +1346,7 @@ The AFC response's `availableFrequencyInfo` contains a list of PSD limit entries
 
 The conversion formula converts a PSD limit to an EIRP limit for a channel of given bandwidth:
 
-**EIRP_from_PSD = maxPsd_dBm_per_MHz + 10 * log10(channel_bandwidth_MHz)**
+**EIRP_from_PSD = maxPsd_dBm_per_MHz + 10 * log10(channel_bandwidth_MHz)**, where `log10` denotes the base-10 logarithm
 
 This formula follows directly from the definition of EIRP and PSD: if the spectral density is maxPsd dBm/MHz and the channel occupies channel_bandwidth_MHz MHz, then the total power (EIRP) is the product in linear scale, which becomes a sum in dB scale: 10 * log10(bandwidth) dB added to the PSD value.
 
