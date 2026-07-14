@@ -181,7 +181,7 @@ First, the present invention moves AFC from a device-local or chipset-local rout
 
 Second, the invention introduces a geolocation validation mechanism that is more than simple location awareness. In `src/afc/afc_utils.py`, the `lla_to_ecef()` and `location_match()` flow transforms latitude and longitude into WGS84 Earth-Centered, Earth-Fixed coordinates and compares old and new registrations against a 200-meter site-policy threshold. The prior-art survey includes location-aware systems and iterative uncertainty tuning, but it does not disclose this ECEF-based cache-invalidation trigger embedded inside a cloud RRM re-registration workflow.
 
-Third, the present implementation enforces a dual-constraint power calculation that combines AFC maxEIRP with PSD-derived EIRP and then applies a bandwidth-specific minimum floor. The implementation reference in `src/afc/afc_utils.py` performs `EIRP_from_PSD = maxPsd_dBm_per_MHz + 10 * log10(channel_bandwidth_MHz) (base-10 logarithm)` and then enforces `ch_max_power = max(AFC_MIN_PSD[bandwidth], int(min(psdEirp[ch], maxEirp[j])))`. The prior-art references discuss channel or power assignment generally, but they do not teach this exact minimum-of-two-constraints plus floor-enforcement pipeline in a cloud-managed AFC controller.
+Third, the present implementation enforces a dual-constraint power calculation that combines AFC maxEirp with PSD-derived EIRP and then applies a bandwidth-specific minimum floor. The implementation reference in `src/afc/afc_utils.py` performs `EIRP_from_PSD = maxPsd_dBm_per_MHz + 10 * log10(channel_bandwidth_MHz) (base-10 logarithm)` and then enforces `ch_max_power = max(AFC_MIN_PSD[bandwidth], int(min(psdEirp[ch], maxEirp[j])))`. The prior-art references discuss channel or power assignment generally, but they do not teach this exact minimum-of-two-constraints plus floor-enforcement pipeline in a cloud-managed AFC controller.
 
 Fourth, the repository discloses operational fallback and lifecycle behaviors absent from the prior-art survey. The `lpi_ok` path in `src/rrmACSV2.py` preserves service by downgrading an AP to Low Power Indoor operation when GPS is unavailable. The AP abnormal-state handler in `src/afc/afc_utils.py` and the DELETE retry logic in `src/afc/afc_query.py` automatically remove stale registrations for AP_UNCLAIMED and AP_UNASSIGNED devices. Prior art typically assumes either valid location data or device-side shutdown; it does not describe this cloud-managed fallback and cleanup sequence.
 
@@ -1066,7 +1066,7 @@ Before the detailed narrative below, the governing mathematical expressions are 
 
 EIRP_from_PSD = maxPsd_dBm_per_MHz + 10 * log10(channel_bandwidth_MHz)
 
-Here, `log10` denotes the base-10 logarithm.
+In this expression, `log10` denotes the base-10 logarithm.
 
 ch_max_power = max(AFC_MIN_PSD[bandwidth], int(min(psdEirp[ch], maxEirp[j])))
 
