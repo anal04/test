@@ -319,6 +319,7 @@ def add_section_with_figures(story, styles, heading, bookmark, blocks, fig_nums,
     append_blocks(story, body_blocks[idx:], styles)
 
 
+
 def build_story(styles, sections, imp_text, fig_brief, fig_details, toc_pages):
     story = []
 
