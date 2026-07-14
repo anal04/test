@@ -598,7 +598,6 @@ The complete payload template includes:
     {"globalOperatingClass": 132},
     {"globalOperatingClass": 133},
     {"globalOperatingClass": 134},
-    {"globalOperatingClass": 136},
     {"globalOperatingClass": 137}
   ]
 }
