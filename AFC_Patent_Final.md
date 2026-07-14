@@ -1449,10 +1449,10 @@ The function `get_mode(channel)` determines the correct mode for a given 20 MHz 
 
 4. Assign to the mode whose center is closer:
    ```
-   return 1 if diff_to_central1 > diff_to_central2 else 2
+   return 1 if diff_to_central1 < diff_to_central2 else 2
    ```
 
-Note: The condition `diff_to_central1 > diff_to_central2` returning Mode 1 appears counterintuitive — it assigns to Mode 1 when the Mode 1 center is farther away. This implements the semantics of "the sub-channel belongs to the wider-bandwidth channel it is more deeply embedded within."
+This comparison ensures that an overlapping 20 MHz sub-channel is associated with the 320 MHz layout whose center channel is nearest in absolute distance.
 
 ### 11. Claims
 
