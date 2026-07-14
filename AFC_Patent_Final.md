@@ -179,9 +179,9 @@ The prior-art material extracted from `AFC_Patent full info.pdf` shows that Qual
 
 First, the present invention moves AFC from a device-local or chipset-local routine into a cloud-scale Radio Resource Management control plane. The code-derived architecture described throughout the repository places AFC orchestration in `src/rrmAFC.py`, `src/rrmACSV2.py`, and `src/rrmHandler.py`, with the AFC proxy communication isolated in `src/afc/afc_query.py`. Prior art such as Qualcomm's foundational AFC request-response family and Intel's AFC allocation scheme focuses on how a device obtains authorization and behaves after authorization; it does not teach the specific use of Apache Storm bolts, Redis-backed state, and per-site policy routing to coordinate large numbers of APs without firmware changes.
 
-Second, the invention introduces a geolocation validation mechanism that is more than simple location awareness. In `src/afc/afc_utils.py`, the `lla_to_ecef()` and `location_match()` flow transforms latitude and longitude into WGS84 Earth-Centered, Earth-Fixed coordinates and compares old and new registrations against a 200 meter site-policy threshold. The prior-art survey includes location-aware systems and iterative uncertainty tuning, but it does not disclose this ECEF-based cache-invalidation trigger embedded inside a cloud RRM re-registration workflow.
+Second, the invention introduces a geolocation validation mechanism that is more than simple location awareness. In `src/afc/afc_utils.py`, the `lla_to_ecef()` and `location_match()` flow transforms latitude and longitude into WGS84 Earth-Centered, Earth-Fixed coordinates and compares old and new registrations against a 200-meter site-policy threshold. The prior-art survey includes location-aware systems and iterative uncertainty tuning, but it does not disclose this ECEF-based cache-invalidation trigger embedded inside a cloud RRM re-registration workflow.
 
-Third, the present implementation enforces a dual-constraint power calculation that combines AFC maxEIRP with PSD-derived EIRP and then applies a bandwidth-specific minimum floor. The implementation reference in `src/afc/afc_utils.py` performs `EIRP_from_PSD = maxPsd_dBm_per_MHz + 10 * log10(channel_bandwidth_MHz)` and then enforces `ch_max_power = max(AFC_MIN_PSD[bandwidth], int(min(psdEirp[ch], maxEirp[j])))`. The prior-art references discuss channel or power assignment generally, but they do not teach this exact minimum-of-two-constraints plus floor-enforcement pipeline in a cloud-managed AFC controller.
+Third, the present implementation enforces a dual-constraint power calculation that combines AFC maxEIRP with PSD-derived EIRP and then applies a bandwidth-specific minimum floor. The implementation reference in `src/afc/afc_utils.py` performs `EIRP_from_PSD = maxPsd_dBm_per_MHz + 10 * log10(channel_bandwidth_MHz) (base-10 logarithm)` and then enforces `ch_max_power = max(AFC_MIN_PSD[bandwidth], int(min(psdEirp[ch], maxEirp[j])))`. The prior-art references discuss channel or power assignment generally, but they do not teach this exact minimum-of-two-constraints plus floor-enforcement pipeline in a cloud-managed AFC controller.
 
 Fourth, the repository discloses operational fallback and lifecycle behaviors absent from the prior-art survey. The `lpi_ok` path in `src/rrmACSV2.py` preserves service by downgrading an AP to Low Power Indoor operation when GPS is unavailable. The AP abnormal-state handler in `src/afc/afc_utils.py` and the DELETE retry logic in `src/afc/afc_query.py` automatically remove stale registrations for AP_UNCLAIMED and AP_UNASSIGNED devices. Prior art typically assumes either valid location data or device-side shutdown; it does not describe this cloud-managed fallback and cleanup sequence.
 
@@ -293,7 +293,7 @@ The invention provides a geolocation change detection method using Earth-Centere
    - Flattening: **f = 1 / 298.257223563**
    - Semi-minor axis: **b = a * (1 - f)**
    - Normal radius of curvature: **N = a / sqrt(1 - f(2 - f) * sin^2(lat))**
-   - ECEF coordinates: x = (N + alt) * cos(lat) * cos(lon); y = (N + alt) * cos(lat) * sin(lon)
+   - ECEF coordinates: x = (N + alt) * cos(lat) * cos(lon); y = (N + alt) * cos(lat) * sin(lon); z = (N * (1 - f)^2 + alt) * sin(lat)
 
 2. Compute Euclidean distance in the XY plane: **distance = sqrt((x_new - x_old)^2 + (y_new - y_old)^2)**
 3. Compute absolute height difference: **height_diff = |h_new - h_old|**
@@ -1066,6 +1066,8 @@ Before the detailed narrative below, the governing mathematical expressions are 
 
 EIRP_from_PSD = maxPsd_dBm_per_MHz + 10 * log10(channel_bandwidth_MHz)
 
+Here, `log10` denotes the base-10 logarithm.
+
 ch_max_power = max(AFC_MIN_PSD[bandwidth], int(min(psdEirp[ch], maxEirp[j])))
 
 eccentricity_squared_e2 = f * (2 - f)
@@ -1176,7 +1178,7 @@ y = (N + alt) * cos(lat_rad) * sin(lon_rad)
 z = (N * (1 - f)^2 + alt) * sin(lat_rad)
 ```
 
-Note: The z formula uses `N * (1 - f)^2` rather than `b^2/a^2 * N` for computational efficiency; both are equivalent given the WGS84 definition.
+Note: The z formula uses `N * (1 - f)^2` rather than `b^2/a^2 * N` for computational efficiency; because `b = a * (1 - f)`, it follows that `b^2/a^2 = (a * (1 - f))^2 / a^2 = (1 - f)^2`, so the two forms are mathematically equivalent under the WGS84 definition.
 
 **Return value**: Tuple `(x, y, z)` in meters.
 
@@ -1294,6 +1296,8 @@ ch_max_power = max(
     AFC_MIN_PSD.get(bandwidth, 13),
     int(min(psdEirp[ch], maxEirp[j]))
 )
+# legacy fallback 13 dBm applies only if an unsupported bandwidth is supplied;
+# supported AFC bandwidths are 20, 40, 80, 160, and 320 MHz.
 ```
 
 This implements the dual-constraint with floor:
