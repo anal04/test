@@ -1069,9 +1069,9 @@ EIRP_from_PSD = maxPsd_dBm_per_MHz + 10 * log10(channel_bandwidth_MHz)
 
 ch_max_power = max(AFC_MIN_PSD[bandwidth], int(min(psdEirp[ch], maxEirp[j])))
 
-e2 = f * (2 - f)
+eccentricity_squared_e2 = f * (2 - f)
 
-normal_radius_N = a / sqrt(1 - e2 * sin(latitude_radians)^2)
+normal_radius_N = a / sqrt(1 - eccentricity_squared_e2 * sin(latitude_radians)^2)
 
 x_ecef = (normal_radius_N + altitude_m) * cos(latitude_radians) * cos(longitude_radians)
 
@@ -1784,9 +1784,9 @@ This formula block presents the WGS84-to-ECEF mathematics in plain text so that 
 ┌──────────────────────────────────────────────────────────────┐
 │ a = 6378137.0 m                                             │
 │ f = 1/298.257223563                                         │
-│ e2 = f * (2 - f)                                            │
-│ normal_radius_N = a / sqrt(1 - e2 *                        │
-│                   sin(latitude_radians)^2)                  │
+│ eccentricity_squared_e2 = f * (2 - f)                      │
+│ normal_radius_N = a / sqrt(1 -                             │
+│ eccentricity_squared_e2 * sin(latitude_radians)^2)         │
 │ x_ecef = (normal_radius_N + altitude_m) *                   │
 │          cos(latitude_radians) * cos(longitude_radians)     │
 │ y_ecef = (normal_radius_N + altitude_m) *                   │
